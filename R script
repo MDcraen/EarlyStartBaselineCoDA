@@ -1,0 +1,794 @@
+# ---- PREAMBLE ----
+
+### **** EARLY START BASELINE PROJECT****
+#
+# Script: "The association between 24-hour movement behaviours and adiposity
+#          among Australian preschoolers: a compositional data analysis"
+# Year: 2023-2024
+# Conducted by:
+#   Marga Decraene(1,2), 
+#   Dorothea Dumuid(3), 
+#   Ty Stanford(3) and 
+#   Kar Hau Chong (4)
+# Affilitions: 
+# (1) Department of Rehabilitation Sciences, Ghent University,Belgium, 
+# (2) Department of Movement and Sports Sciences, Ghent University, Belgium, 
+# (3) Allied Health and Human Performance, Alliance for Research in Exercise 
+#     Nutrition and Activity (ARENA), University of South Australia, 
+#     Adelaide, Australia, 
+# (4) Early Start, Faculty of the Arts, Social Sciences and Humanities, 
+#     University of Wollongong, Wollongong, NSW 2522, Australia, 
+# (5) School of Health and Society, Faculty of the Arts, Social Sciences and 
+#     Humanities, University of Wollongong, Wollongong, NSW 2522, Australia
+#
+### *********
+
+### Contents: ####
+# PART 1: DESCRIPTIVE CHARACTERISTICS AND CODA MODELS
+# part 1 Variable directory
+#   1.1 Data cleaning and descriptives
+#   1.2 Comparison weight groups - BOOTSTRAP
+#   1.3 Compositional analyses - regressions
+#     1.3.1 ISOMETRIC LOG RATIOS
+#     1.3.2 LINEAR MODELS
+#       1.3.2.1 OVERALL GROUP
+#       1.3.2.2 WEIGHT GROUPS
+#   1.4 Reallocations
+# PART 2: ATTRITION ANALYSES
+# part 2 Variable directory
+#   2.1 MCAR test
+#   2.2 Logistic regressions
+
+
+
+
+### Part 0: Packages ####
+
+
+# install.packages("tidyverse") 
+# reference: Hadley Wickham, 2023, tidyverse: Easily Install and Load the
+# 'Tidyverse', Link (https://CRAN.R-project.org/package=dplyr)
+library("tidyverse")
+library("readxl") 
+
+# install.packages("tableone")
+# reference: Kazuki Yoshida, 2022, Create 'Table 1' to Describe Baseline
+# Characteristics with or without Propensity Score Weights. Link
+# (https://CRAN.R-project.org/package=tableone)
+library("tableone")
+
+# install.packages("compositions") 
+# reference: K. Gerald van de Boogaart, Raimon Tolosana-Delgado,and 
+# Matevz Bren, 2024, Compositional Data Analysis, Link
+# (https://CRAN.R-project.org/package=compositions)
+library("compositions") 
+
+# install.packages(codaredistlm) 
+# reference: Ty Stanford, Charlotte Lund Rasmussen, and Dot Dumuid, 2022,
+# codaredistlm: Compositional Data Linear Models with Composition Redistribution,
+# Link (https://CRAN.R-project.org/package=codaredistlm)
+library("codaredistlm")
+
+# install.packages("lme4") 
+# reference: Douglas Bates et al., 2024, lme4: Linear Mixed-Effects Models using
+# 'Eigen' and S4, Link (https://CRAN.R-project.org/package=lme4)
+library("lme4") 
+
+# install.packages("lmerTest") 
+# Kuznetsova A, Brockhoff PB, Christensen RHB (2017). “lmerTest Package: Tests
+# in Linear Mixed Effects Models.” _Journal of Statistical Software_, *82*(13),
+# 1-26. doi:10.18637/jss.v082.i13 <https://doi.org/10.18637/jss.v082.i13>.
+library("lmerTest")
+
+# install.packages("performance") 
+# reference: 	Daniel Lüdecke et al., 2024, performance: Assessment of Regression
+# Models Performance, Link (https://CRAN.R-project.org/package=performance)
+library("performance")
+
+# install.packages("car") 
+# reference: John Fox et al., 2019, car: companion to Applied Regression, Link
+# (https://CRAN.R-project.org/package=car )
+library("car") 
+
+# install.packages("lmtest") 
+# reference: 	Torsten Hothorn et al., 2022, lmtest: Testing Linear Regression
+# Models, Link (https://CRAN.R-project.org/package=lmtest)
+library("lmtest") 
+
+# install.packages("boot")
+# reference: Angelo Canty, Brian Ripley, and Alessandra R. Brazzale, 2024,
+# Bootstrap Functions (Originally by Angelo Canty for S), Link
+# (https://CRAN.R-project.org/package=boot)
+library("boot") 
+
+# install.packages("rstan") 
+# reference: 	Jiqiang Guo et al., 2024, rstan: R Interface to Stan, Link
+# (https://CRAN.R-project.org/package=rstan)
+library("rstan") 
+
+# install.packages("StanHeaders") 
+# reference: 	Ben Goodrich et al., 2024, StanHeaders: C++ Header Files for
+# Stan, Link (https://CRAN.R-project.org/package=StanHeaders)
+library("StanHeaders")
+
+# install.packages("MKinfer") 
+# reference: Matthias Kohl , 2024, MKinfer: Inferential Statistics, Link
+#(https://CRAN.R-project.org/package=MKinfer)
+library("MKinfer")
+
+# install.packages("naniar") # http://naniar.njtierney.com/
+# reference: Nicholas Tierney et al., 2024, naniar: Data Structures, Summaries,
+# and Visualisations for Missing Data, Link
+# (https://CRAN.R-project.org/package=naniar)
+library("naniar") 
+
+# install.packages("mice")
+# reference: 	Stef van Buuren et al., 2023, mice: Multivariate Imputation by
+# Chained Equations, Link (https://CRAN.R-project.org/package=mice)
+library("mice") 
+
+# ---- PART_1 ----
+
+# PART 1: DESCRIPTIVE CHARACTERISTICS AND CODA MODELS####
+# part 1 Variable directory####
+## ChildID: ID number of the participant
+## CentreID: ID number of the participating child care centres
+## SLP: Minutes in sleep
+## SB: Minutes in sedentary behaviour
+## LPA: Minutes in light intensive physical activity
+## MVPA: Minutes in moderate-to-vigorous intensive physical activity
+## age: age in years of the participant
+## sex: sex of the participant
+## edu: parent educational level in two categories
+## BMI: Body Mass Index (kg/m2)
+## BMIz: Body Mass Index z-score
+## WeightGr: BMIz score categorized in non-overweight and overweight
+
+
+
+# Open required file (make sure directory is right)
+getwd()
+# setwd("/where/data/are/stored")
+data <- read.csv("ESBaseline.csv")
+
+
+
+# 1.1 Data cleaning and descriptives####
+
+
+
+# Get to know the dataset.
+summary(data)
+
+names(data) # tells you the names of the variables
+data <- data[1:787, ] # only keep the first 787 rows
+
+# Get to know the dataset.
+summary(data)
+
+# check if there are any zeros in the movement behaviours. Need to do this
+# before making ilrs.
+data$activity <- cbind.data.frame(data$SLP, data$SB, data$LPA, data$MVPA)
+missingSummary(data$activity) 
+# look at the "BDL" Below Detection Limit column which lists the number of
+# zeros.
+
+# make new dataset with data you need for analyses and clean
+datasubset1 <- subset(data, WeartimeMean >= 480 & CalendarDays >= 3)
+datasubset2 <- 
+  datasubset1 %>% 
+  dplyr::select(ChildID, CentreID, SLP, SB, LPA, MVPA, age_, sex_, edu_, BMI, BMIz)
+data1 <- na.omit(datasubset2)
+summary(data1) # check it
+sum(is.na(data1)) # check it
+
+
+# categorizing BMIz score in non-overweight and overweight taking age into
+# account based on WHO recommendations (risk group categorized in the
+# non-overweight group)
+data1$WeightGr_[data1$BMIz > 1 & data1$age >= 5] <- 
+  "overweight"
+data1$WeightGr_[data1$BMIz > 2 & data1$age < 5] <- 
+  "overweight"
+data1$WeightGr_[data1$BMIz > 1 & data1$BMIz <= 2 & data1$age < 5] <- 
+  "notOverweight"
+data1$WeightGr_[data1$BMIz <= 1] <- 
+  "notOverweight"
+
+data1 <-
+  data1 %>%
+  mutate(
+    WeightGr_test = 
+      case_when(
+        (age >= 5) & (BMIz >  1)  ~ "overweight",
+        (age >= 5) & (BMIz <= 1)  ~ "notOverweight",
+        (age < 5)  & (BMIz >  2)  ~ "overweight",
+        (age < 5)  & (BMIz <= 2)  ~ "notOverweight",
+        TRUE                      ~ "Error_check_values"
+      )
+  )
+
+# check agreement between two methods
+with(
+  data1,
+  table(WeightGr_test, WeightGr_, useNA = "ifany")
+)
+
+# another way to manual check agreement between two methods based on raw vals
+data1 %>%
+  dplyr::select(age, BMIz, WeightGr_, WeightGr_test) %>%
+  dplyr::arrange(age, BMIz) %>%
+  print(., n = nrow(.))
+
+# make sure the variables have the right class for analyses
+str(data1)
+data1$sex <- as.factor(data1$sex_)
+data1$edu <- as.factor(data1$edu_)
+data1$WeightGr <- as.factor(data1$WeightGr_)
+
+# descriptives
+tableone <- 
+  CreateTableOne(
+    vars = c("sex", "age", "edu", "WeightBMI", "BMI", "BMIz", "SLP", "SB", "LPA", "MVPA"),
+    data = data1
+  )
+tabletwo <- 
+  CreateTableOne(
+    vars = c("sex", "age", "edu", "BMI", "BMIz", "SLP", "SB", "LPA", "MVPA"), 
+    strata = "WeightGr", 
+    data = data1
+  ) # you can copy this in excel and with tab data (use tab "data" for your columns)
+
+
+agen <- as.numeric(data1$age)
+WeightBMIn <- as.numeric(data1$WeightBMI)
+BMIn <- as.numeric(data1$BMIz)
+SLPn <- as.numeric(data1$SLP)
+SBn <- as.numeric(data1$SB)
+LPAn <- as.numeric(data1$LPA)
+MVPAn <- as.numeric(data1$MVPA)
+hist(agen)
+hist(WeightBMIn)
+hist(BMIn)
+hist(SLPn)
+hist(SBn)
+hist(LPAn)
+hist(MVPAn)
+
+# print
+tableone
+tabletwo
+
+# compositional descriptives
+data1$activity <- cbind.data.frame(data1$SLP, data1$SB, data1$LPA, data1$MVPA)
+data1$act.comp <- acomp(data1$activity)
+# this is the mean composition, adjusted to sum to 1440 min/day.
+m <- round(clo(mean(data1$act.comp), total = 1440)) 
+# variation matrix, rounded to make it nicer: gives us an idea of the spread of
+# the compositional parts, pairwise. values closer to zero are more dependent on
+# each other. Zero=exactly proportional. this replaces univariate standard
+# deviation.
+round(variation(data1$act.comp), digits = 3)
+
+ow <- subset(data1, data1$WeightGr == "overweight")
+round(clo(mean(ow$act.comp), total = 1440))
+round(variation(ow$act.comp), digits = 3)
+nOw <- subset(data1, data1$WeightGr == "notOverweight")
+round(clo(mean(nOw$act.comp), total = 1440))
+round(variation(nOw$act.comp), digits = 3)
+
+
+bmi_sleep_ow <- data1$act.comp[, 1][data1$WeightGr == "overweight"]
+bmi_sleep_nOw <- data1$act.comp[, 1][data1$WeightGr == "notOverweight"]
+bmi_SB_ow <- data1$act.comp[, 2][data1$WeightGr == "overweight"]
+bmi_SB_nOw <- data1$act.comp[, 2][data1$WeightGr == "notOverweight"]
+bmi_LPA_ow <- data1$act.comp[, 3][data1$WeightGr == "overweight"]
+bmi_LPA_nOw <- data1$act.comp[, 3][data1$WeightGr == "notOverweight"]
+bmi_MVPA_ow <- data1$act.comp[, 4][data1$WeightGr == "overweight"]
+bmi_MVPA_nOw <- data1$act.comp[, 4][data1$WeightGr == "notOverweight"]
+perm.t.test(bmi_sleep_ow, bmi_sleep_nOw)
+perm.t.test(bmi_SB_ow, bmi_SB_nOw)
+perm.t.test(bmi_LPA_ow, bmi_LPA_nOw)
+perm.t.test(bmi_MVPA_ow, bmi_MVPA_nOw)
+
+
+# 1.2 Comparison weight groups - BOOTSTRAP####
+
+# comparison of movement behaviour composition between groups
+
+
+
+DF <- cbind.data.frame(data1$SLP, data1$SB, data1$LPA, data1$MVPA, data1$WeightGr)
+DF <- as.data.frame(DF)
+
+## MANOVA to compare composition between weight groups
+
+DF$comp <- acomp(cbind(data1$SLP, data1$SB, data1$LPA, data1$MVPA))
+DF$ilr.comp <- ilr(DF$comp)
+mod <- manova(ilr.comp ~ data1$WeightGr, data = DF)
+summary(mod)
+
+# here you write the function you want to bootstrap. The function will give you
+# your logratio differences 
+# d is the dataframe that you tell it to use later, and
+# iv is the index variable (will be resampled)
+Log.ratio.diff <- function(d, iv) {
+  Sleep <- d[iv, 1]
+  SB <- d[iv, 2]
+  LPA <- d[iv, 3]
+  MVPA <- (d[iv, 4])
+  weight_group <- as.factor(d[iv, 5])
+  # put resampled variables into a dataframe for later
+  data <- cbind.data.frame(Sleep, SB, LPA, MVPA, weight_group)
+  # now you tell R what to do with the variables
+  # can do it how you like, but might be easiest to split the dataset into wt groups
+  NotOverweight <- subset(data, data$weight_group == "notOverweight")
+  Overweight <- subset(data, data$weight_group == "overweight")
+  # you could just get the geometric means of each group, rather than using
+  # mean(acomp(cbind(sleep,sb,lpa,mvpa)))?
+  Mean.NotOverweight <- 
+    geometricmeanCol(cbind(
+      NotOverweight$Sleep, NotOverweight$SB, NotOverweight$LPA, NotOverweight$MVPA
+    ))
+  Mean.Overweight <- 
+    geometricmeanCol(cbind(
+      Overweight$Sleep, Overweight$SB, Overweight$LPA, Overweight$MVPA
+    ))
+  # get lrdiffs
+  Lrdiff <- log(Mean.Overweight / Mean.NotOverweight)
+  # put lrdiffs into dataframe
+  Results <- Lrdiff
+  return(Results)
+}
+# then run the above function on your dataset
+# positive value indicates greater time spent on the behaviour for the numerator
+# (i.e., Overweight in this example) ###ZIT HIER VAST888
+lrd <- Log.ratio.diff(DF) 
+# back-transformed into percentages for interpretation then you bootstrap that
+lrd.percent <- (exp(lrd) - 1) * 100 
+(xd.boot <- boot(DF, Log.ratio.diff, 1000))
+cis <- matrix(0, 2, 4)
+# the 2 is for high/low CI, the 4 should be replaced with how many rows you have
+# in xd.boot
+for (var in 1:4) {
+  xd.boot.ci <- boot.ci(xd.boot, index = var, conf = 0.95, type = "perc")
+  cis[, var] <- xd.boot.ci$per[4:5]
+}
+# these are the CIs for each part of the MB composition (significantly different
+# if the CIs don't cross 0)
+cis 
+
+# set up points for the plot
+Sleep <- c(lrd[1])
+SB <- c(lrd[2])
+LPA <- c(lrd[3])
+MVPA <- c(lrd[4])
+
+# plot
+dev.off() # to print only one plot in each page
+plot(
+  NA, 
+  xlim = c(0, 5), ylim = c(-0.40, 0.40), 
+  xlab = "", ylab = "Mean log-ratio difference", xaxt = "n"
+)
+# We'll add a y-axis labelling our variables:
+axis(1, 1:4, c("Sleep", "SB", "LPA", "MVPA"), las = 2)
+# We'll add a vertical line for zero:
+abline(h = 0, col = "gray")
+# Then we'll draw our log ratio difference points
+# pch refers to points shape and cex refers to size
+points(
+  y = c(Sleep, SB, LPA, MVPA), 1:4, pch = 18, cex = 1.5, 
+  col = "black", bg = "black"
+)
+
+# Then we'll add bootstrap 95% CIs
+# lwd refers to line thickness
+segments(y0 = cis[1, 1], 1, y1 = cis[2, 1], 1, col = "black", lwd = 1) 
+segments(y0 = cis[1, 2], 2, y1 = cis[2, 2], 2, col = "black", lwd = 1)
+segments(y0 = cis[1, 3], 3, y1 = cis[2, 3], 3, col = "black", lwd = 1)
+segments(y0 = cis[1, 4], 4, y1 = cis[2, 4], 4, col = "black", lwd = 1)
+
+# test the difference
+DF$comp <- acomp(cbind(data1$SLP, data1$SB, data1$LPA, data1$MVPA))
+DF$ilr.comp <- ilr(DF$comp)
+mod <- manova(ilr.comp ~ data1$WeightGr, data = DF)
+summary(mod)
+
+
+# 1.3 Compositional analyses - regressions####
+
+
+# formula we need later
+sbp1 <- matrix(
+  c(
+    1, -1, -1, -1,
+    0, 1, -1, -1,
+    0, 0, 1, -1
+  ),
+  ncol = 4, byrow = TRUE
+)
+colnames(sbp1) <- c("SLP", "SB", "LPA", "MVPA")
+rownames(sbp1) <- paste0("ilr", 1:nrow(sbp1))
+psi1 <- gsi.buildilrBase(t(sbp1)) ## The orthonormal matrix
+
+
+
+
+# 1.3.1 ISOMETRIC LOG RATIOS####
+# create isometric log ratios and put into a dataframe (X)
+
+
+
+
+# Sleep (this is the original order of movement behaviours in the dataset)
+data1$SleepComp <- cbind.data.frame(data1$SLP, data1$SB, data1$LPA, data1$MVPA)
+ilr.sleep <- ilr(data1$SleepComp, V = psi1)
+
+# SB
+data1$SBcomp <- cbind.data.frame(data1$SB, data1$LPA, data1$MVPA, data1$SLP)
+ilr.SB <- ilr(data1$SBcomp, V = psi1)
+
+# LPA
+data1$LPAcomp <- cbind.data.frame(data1$LPA, data1$MVPA, data1$SLP, data1$SB)
+ilr.LPA <- ilr(data1$LPAcomp, V = psi1)
+
+# MVPA
+data1$MVPAcomp <- cbind.data.frame(data1$MVPA, data1$SLP, data1$SB, data1$LPA)
+ilr.MVPA <- ilr(data1$MVPAcomp, V = psi1)
+
+
+
+# 1.3.2 LINEAR MODELS####
+
+# 1.3.2.1. OVERALL GROUP####
+
+
+
+# Now we use the ilr coordinates as explanatory variables in our linear model.
+# BMIz is the dependent variable, with covariates of parental educational level
+# "edu", "sex", and "age".
+
+#*********************************
+# check if mixed model is necessary
+# Model with nesting:
+lmer.Sleep <- 
+  lmer(
+    BMIz ~ ilr.sleep + edu + sex + age + (1 | data1$CentreID), 
+    data = data1
+  )
+car::Anova(lmer.Sleep)
+summary(lmer.Sleep)
+
+# check if mixed model is necessary
+s <- step(lmer.Sleep) # backwards elimination of random effect
+s # no significant random effect (p=1??) #this means that the random intercept for CentreID (written as((1|Data1$CentreID)) does not seem to vary - that is, the model cannot find variance between the centres once accounting for other factors (also see random effects for summary(lmer.Sleep). This justifies to not use a mixed model. Based on this result and to not overcomplicate it, we decide to use a standard multilevel linear regression model.
+
+# comparing with no nesting
+lm.Sleep <- lm(BMIz ~ ilr.sleep + edu + sex + age, data = data1)
+car::Anova(lm.Sleep)
+summary(lm.Sleep)
+#*********************************
+
+
+# Check the model fit
+# model diagnostics
+lm.Sleep <- lm(BMIz ~ ilr.sleep + edu + sex + age, data = data1)
+par(mfrow = c(2, 2))
+plot(lm.Sleep) # based on this 3 participants should be checked (row 10,16 and 78). They all have high (but realistic) BMI z-scores. They remain included in the study.
+lm.Sleep$fitted.values
+
+check_model(lm.Sleep)
+
+# Pivot
+
+# Sleep
+lm.Sleep <- lm(BMIz ~ ilr.sleep + edu + sex + age, data = data1)
+car::Anova(lm.Sleep)
+summary(lm.Sleep) # look at the first behaviour. Gives results for sleep.
+
+# SB
+lm.SB <- lm(BMIz ~ ilr.SB + edu + sex + age, data = data1)
+car::Anova(lm.SB)
+summary(lm.SB) # look at the first behaviour. Gives results for SB.
+
+# LPA
+lm.LPA <- lm(BMIz ~ ilr.LPA + edu + sex + age, data = data1)
+car::Anova(lm.LPA)
+summary(lm.LPA) # look at the first behaviour. Gives results for LPA.
+
+# MVPA
+lm.MVPA <- lm(BMIz ~ ilr.MVPA + edu + sex + age, data = data1)
+car::Anova(lm.MVPA)
+summary(lm.MVPA) # look at the first behaviour. Gives results for MVPA.
+
+
+
+# 1.3.2.2 WEIGHT GROUPS####
+
+
+
+# Check for interaction effect weight groups
+Interaction <- lm(BMIz ~ ilr.sleep * WeightGr + edu + sex + age, data = data1)
+car::Anova(Interaction) # there is an interaction effect
+summary(Interaction)
+
+# Do the models again for both groups
+
+
+# NOT OVERWEIGHT
+
+
+dataNoOW <- subset(data1, WeightGr == "notOverweight")
+
+# Sleep
+dataNoOW$SleepComp <- 
+  cbind.data.frame(dataNoOW$SLP, dataNoOW$SB, dataNoOW$LPA, dataNoOW$MVPA)
+ilr.sleepNoOW <- ilr(dataNoOW$SleepComp, V = psi1)
+lm.SleepNoOW <- lm(BMIz ~ ilr.sleepNoOW + edu + sex + age, data = dataNoOW)
+car::Anova(lm.SleepNoOW)
+summary(lm.SleepNoOW)
+# SB
+dataNoOW$SBcomp <- 
+  cbind.data.frame(dataNoOW$SB, dataNoOW$LPA, dataNoOW$MVPA, dataNoOW$SLP)
+ilr.SBNoOW <- ilr(dataNoOW$SBcomp, V = psi1)
+lm.SBNoOW <- lm(BMIz ~ ilr.SBNoOW + edu + sex + age, data = dataNoOW)
+car::Anova(lm.SBNoOW)
+summary(lm.SBNoOW)
+
+# LPA
+dataNoOW$LPAcomp <- 
+  cbind.data.frame(dataNoOW$LPA, dataNoOW$MVPA, dataNoOW$SLP, dataNoOW$SB)
+ilr.LPANoOW <- ilr(dataNoOW$LPAcomp, V = psi1)
+lm.LPANoOW <- lm(BMIz ~ ilr.LPANoOW + edu + sex + age, data = dataNoOW)
+car::Anova(lm.LPANoOW)
+summary(lm.LPANoOW)
+
+# MVPA
+dataNoOW$MVPAcomp <- 
+  cbind.data.frame(dataNoOW$MVPA, dataNoOW$SLP, dataNoOW$SB, dataNoOW$LPA)
+ilr.MVPANoOW <- ilr(dataNoOW$MVPAcomp, V = psi1)
+lm.MVPANoOW <- lm(BMIz ~ ilr.MVPANoOW + edu + sex + age, data = dataNoOW)
+car::Anova(lm.MVPANoOW)
+summary(lm.MVPANoOW)
+
+
+# OVERWEIGHT
+
+
+dataOW <- subset(data1, WeightGr == "overweight")
+
+# Sleep
+dataOW$SleepComp <- 
+  cbind.data.frame(dataOW$SLP, dataOW$SB, dataOW$LPA, dataOW$MVPA)
+ilr.sleepOW <- ilr(dataOW$SleepComp, V = psi1)
+lm.SleepOW <- lm(BMIz ~ ilr.sleepOW + edu + sex + age, data = dataOW)
+car::Anova(lm.SleepOW)
+summary(lm.SleepOW)
+# SB
+dataOW$SBcomp <- 
+  cbind.data.frame(dataOW$SB, dataOW$LPA, dataOW$MVPA, dataOW$SLP)
+ilr.SBOW <- ilr(dataOW$SBcomp, V = psi1)
+lm.SBOW <- lm(BMIz ~ ilr.SBOW + edu + sex + age, data = dataOW)
+car::Anova(lm.SBOW)
+summary(lm.SBOW)
+# LPA
+dataOW$LPAcomp <- 
+  cbind.data.frame(dataOW$LPA, dataOW$MVPA, dataOW$SLP, dataOW$SB)
+ilr.LPAOW <- ilr(dataOW$LPAcomp, V = psi1)
+lm.LPAOW <- lm(BMIz ~ ilr.LPAOW + edu + sex + age, data = dataOW)
+car::Anova(lm.LPAOW)
+summary(lm.LPAOW)
+# MVPA
+dataOW$MVPAcomp <- 
+  cbind.data.frame(dataOW$MVPA, dataOW$SLP, dataOW$SB, dataOW$LPA)
+ilr.MVPAOW <- ilr(dataOW$MVPAcomp, V = psi1)
+lm.MVPAOW <- lm(BMIz ~ ilr.MVPAOW + edu + sex + age, data = dataOW)
+car::Anova(lm.MVPAOW)
+summary(lm.MVPAOW)
+
+# 1.4 Reallocations####
+
+
+# Codaredistlm - Reallocation Graphs
+
+pred_df <-
+  predict_delta_comps(
+    dataf = data1,
+    y = "BMIz",
+    comps = c("SLP", "SB", "LPA", "MVPA"),
+    covars = c("edu", "sex", "age"),
+    # you cannot reallocate more than the mean (check mean of composition to
+    # know), predict_delta_comps() will warn you about this
+    deltas = seq(-60, 60, by = 10) / (24 * 60),
+    comparisons = "prop-realloc", # or try "one-v-one"
+    alpha = 0.05 # 95% CI
+  )
+pred_df
+plot_delta_comp(
+  # provide the returned object from predict_delta_comps() x-axis can be
+  # converted from proportion of composition to meaningful units
+  pred_df, 
+  comp_total = 24 * 60, # minutes available in the composition
+  units_lab = "min" # just a label for plotting
+)
+
+pred_df1 <-
+  predict_delta_comps(
+    dataf = data1,
+    y = "BMIz",
+    comps = c("SLP", "SB", "LPA", "MVPA"),
+    covars = c("edu", "sex", "age"),
+    deltas = seq(-60, 60, by = 10) / (24 * 60),
+    comparisons = "one-v-one",
+    alpha = 0.05
+  )
+
+plot_delta_comp(
+  pred_df1,
+  comp_total = 24 * 60,
+  units_lab = "min"
+)
+
+pred_df1
+
+
+# when it looks symmetrical it is because seq is not broad enough. Closer to
+# zero is more symmetrical.
+
+
+
+# ---- PART_2 ----
+
+
+# PART 2: ATTRITION ANALYSES####
+
+# part 2 Variable directory####
+## SLP: Minutes in sleep
+## SB: Minutes in sedentary behaviour
+## LPA: Minutes in light intensive physical activity
+## MVPA: Minutes in moderate-to-vigorous intensive physical activity
+## Age: age in years of the participant
+## Sex: sex of the participant
+## Education: parent educational level in two categories
+## BMIz: Body Mass Index z-score
+## Accelerometer: average weartime in minutes of the accelerometer, 
+##                starting from 8h/day
+
+
+## Open required file (make sure directory is right)
+getwd()
+data <- read.csv("ESBaseline_attrition.csv")
+data <- data[1:787, ]
+
+
+# 2.1 MCAR test####
+# Check "missing completely at random" (MCAR) or "missing at random" (MAR)
+mcar_cols <-
+  c(
+    "Age", "BMIz", "Education",
+    "Sleep", "Accelerometer"
+  )
+mcar_cols
+data_mcar <- cbind(data[, mcar_cols])
+nrow(data_mcar)
+table(rowSums(!is.na(data_mcar)))
+# remove rows that are ALL NAs
+data_mcar <- data_mcar[rowSums(!is.na(data_mcar)) > 0, ] 
+nrow(data_mcar)
+head(data_mcar)
+
+mcar_test(data_mcar)
+
+
+par(mfrow = c(1, 1))
+md.pattern(data_mcar, rotate.names = TRUE) # Missing Data Pattern Plot
+
+
+
+# 2.2 Logistic regressions####
+
+
+
+# create isometric log ratios and put into a dataframe (X)
+# we want to know weather the compositions predicts missing data or not.
+
+data$comp4 <- cbind.data.frame(data$SLP, data$SB, data$LPA, data$MVPA)
+ilr.comp4 <- ilr(data$comp4, V = psi4)
+
+
+ilr.comp4 <- as.data.frame(ilr.comp4)
+table(rowSums(abs(ilr.comp4) < 1e-12) >= 2)
+head(ilr.comp4, n = 25)
+ilr.comp4[rowSums(abs(ilr.comp4) < 1e-12) >= 2, ] <- NA
+head(ilr.comp4, n = 25)
+
+cbind(ilr.comp4, data$comp4)
+
+
+# logistic regression models
+# Variables included in analyses is based on missing data pattern plot.(No
+# analyses for Age and Sex, because there was only one missing for Age and no
+# missings for Sex)
+
+# checking if ilr coordinates (V1, V2 and V3) are related to valid BMIz data
+summary(
+  logis_regBMIz <- 
+    glm(
+      is.na(BMIz) ~ Education + Age + Sex + V1 + V2 + V3, 
+      family = binomial, 
+      data = data_mcar2
+    )) 
+summary(
+  logis_regBMIz <- 
+    glm(
+      is.na(BMIz) ~ Education + Age + Sex + Accelerometer + Sleep, 
+      family = binomial, 
+      data = data_mcar2
+    ))
+# Sleep not included because only one participant with valid data when invalid
+# Education data
+summary(
+  logis_regEducation <- 
+    glm(
+      is.na(Education) ~ BMIz + Age + Sex + Accelerometer, 
+      family = binomial, 
+      data = data_mcar2
+    )) 
+# V1 not included because only one participant with valid data for sleep when
+# invalid Education data
+summary(
+  logis_regEducation <- 
+    glm(
+      is.na(Education) ~ BMIz + Age + Sex + V2 + V3, 
+      family = binomial, 
+      data = data_mcar2
+    )) 
+summary(
+  logis_regSleep <- 
+    glm(
+      is.na(Sleep) ~ BMIz + Age + Sex + Accelerometer + Education, 
+      family = binomial, 
+      data = data_mcar2
+    ))
+summary(
+  logis_regAccelerometer <- 
+    glm(
+      is.na(Accelerometer) ~ BMIz + Age + Sex + Sleep + Education, 
+      family = binomial, 
+      data = data_mcar2
+    ))
+
+# CI's and Odds ratio's for significant  associations
+predict.glm(logis_regAccelerometer, type = "response")
+summary(logis_regAccelerometer)
+se <- sqrt(diag(vcov(logis_regAccelerometer)))
+coefficients(logis_regAccelerometer)
+
+these_coefs <- coefficients(logis_regAccelerometer)
+
+# table of estimates with 95% CI
+(tab <- cbind(
+  Est = these_coefs,
+  LL = these_coefs - 1.96 * se,
+  UL = these_coefs + 1.96 * se
+))
+exp(tab) # to get odds ratios instead of coefficients and CI's.
+
+predict.glm(logis_regEducation, type = "response")
+summary(logis_regEducation)
+se <- sqrt(diag(vcov(logis_regEducation)))
+coefficients(logis_regEducation)
+
+these_coefs <- coefficients(logis_regEducation)
+
+# table of estimates with 95% CI
+(tab <- cbind(
+  Est = these_coefs,
+  LL = these_coefs - 1.96 * se,
+  UL = these_coefs + 1.96 * se
+))
+exp(tab) # to get odds ratios instead of coefficients and CI's.
+
+
+# ---- SCRIPT_END ----
